@@ -1,0 +1,62 @@
+{
+  "name": "indian-stock-market-mcp",
+  "version": "1.0.0",
+  "description": "Indian Stock Market MCP Server — Live NSE/BSE stock prices, portfolio tracker, stock screener, crypto prices, and market summary. Free Yahoo Finance data, no API key needed.",
+  "author": "TRIKAAL",
+  "license": "MIT",
+  "mcp": {
+    "type": "stdio",
+    "command": "python",
+    "args": ["mcp_server.py"],
+    "cwd": "."
+  },
+  "tools": [
+    {
+      "name": "get_price",
+      "description": "Get live price for any NSE/BSE stock (RELIANCE, TCS, INFY, etc.)"
+    },
+    {
+      "name": "get_history",
+      "description": "Get historical OHLCV data for any stock (1d to 10y)"
+    },
+    {
+      "name": "get_company_info",
+      "description": "Get company fundamentals: sector, market cap, PE, PB, dividend yield, EPS"
+    },
+    {
+      "name": "get_top_gainers",
+      "description": "Get top gaining stocks on NSE today"
+    },
+    {
+      "name": "get_top_losers",
+      "description": "Get top losing stocks on NSE today"
+    },
+    {
+      "name": "get_portfolio",
+      "description": "Calculate portfolio value, P&L, and weights for your holdings"
+    },
+    {
+      "name": "screen_stocks",
+      "description": "Screen 50 NSE stocks by PE ratio, sector, dividend yield"
+    },
+    {
+      "name": "get_crypto_price",
+      "description": "Get cryptocurrency price in INR (BTC, ETH, SOL, etc.)"
+    },
+    {
+      "name": "get_market_summary",
+      "description": "Get Nifty 50, Sensex, and market breadth"
+    },
+    {
+      "name": "search_stock",
+      "description": "Search for stocks by name or symbol"
+    }
+  ],
+  "keywords": ["india", "stock market", "nse", "bse", "nifty", "sensex", "trading", "investment", "portfolio", "crypto"],
+  "pricing": {
+    "type": "freemium",
+    "free": ["get_price", "get_history", "get_company_info", "get_top_gainers", "get_top_losers", "get_crypto_price", "get_market_summary", "search_stock"],
+    "premium": ["get_portfolio", "screen_stocks"]
+  },
+  "repository": "https://github.com/trikaal/indian-stock-market-mcp"
+}
