@@ -1,0 +1,47 @@
+{
+  "name": "bharat-mcp",
+  "displayName": "Bharat MCP",
+  "description": "Indian Market Intelligence for AI Agents — 32 tools for NSE/BSE stock data, portfolio tracking, AI-powered screening, options chain, FII/DII flows, candlestick patterns, news sentiment, and more. Zero setup, free tier available.",
+  "version": "1.0.0",
+  "author": "Bharat MCP",
+  "license": "MIT",
+  "repository": "https://github.com/projecttrivi1111/bharat-mcp",
+  "transport": "stdio",
+  "command": "python",
+  "args": ["mcp_server.py", "--mcp"],
+  "env": {},
+  "dependencies": {
+    "python": ">=3.10",
+    "pip": "requirements.txt"
+  },
+  "tags": ["india", "stock-market", "nse", "bse", "trading", "investment", "portfolio", "crypto", "options", "fii-dii"],
+  "pricing": {
+    "free": {
+      "requests_per_day": 100,
+      "features": ["get_price", "get_history", "get_company_info", "get_top_gainers", "get_top_losers", "get_crypto_price", "get_market_summary", "search_stock"]
+    },
+    "pro": {
+      "price": 999,
+      "currency": "INR",
+      "period": "month",
+      "requests_per_day": 10000,
+      "features": ["all"]
+    },
+    "enterprise": {
+      "price": 2499,
+      "currency": "INR",
+      "period": "month",
+      "requests_per_day": "unlimited",
+      "features": ["all", "api_access", "white_label", "priority_support"]
+    }
+  },
+  "tools_count": 32,
+  "categories": [
+    "Price & History",
+    "Market Overview",
+    "Portfolio & Screening",
+    "Analysis",
+    "News & Data",
+    "Indices & Funds"
+  ]
+}

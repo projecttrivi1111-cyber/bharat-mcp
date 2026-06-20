@@ -1,0 +1,67 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Bharat MCP",
+    "description": "Indian Market Intelligence for AI Agents. 32 tools for NSE/BSE stock data, portfolio tracking, AI-powered screening, options chain, FII/DII flows, candlestick patterns, news sentiment, and more.",
+    "version": "1.0.0",
+    "contact": {
+      "email": "projecttrivi1111@gmail.com"
+    },
+    "license": {
+      "name": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "local",
+      "description": "Local MCP server via stdio"
+    }
+  ],
+  "paths": {},
+  "components": {
+    "schemas": {
+      "Tool": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "description": {"type": "string"},
+          "inputSchema": {"type": "object"}
+        }
+      }
+    }
+  },
+  "x-mcp-tools": [
+    {"name": "get_price", "description": "Get live price for any NSE/BSE stock"},
+    {"name": "get_history", "description": "Get historical OHLCV data"},
+    {"name": "get_company_info", "description": "Get company fundamentals"},
+    {"name": "get_top_gainers", "description": "Get top gaining stocks on NSE today"},
+    {"name": "get_top_losers", "description": "Get top losing stocks on NSE today"},
+    {"name": "get_portfolio", "description": "Calculate portfolio value and P&L"},
+    {"name": "screen_stocks", "description": "Screen NSE stocks by criteria"},
+    {"name": "get_crypto_price", "description": "Get cryptocurrency price in INR"},
+    {"name": "get_market_summary", "description": "Get Nifty 50, Sensex, market breadth"},
+    {"name": "search_stock", "description": "Search for stocks by name or symbol"},
+    {"name": "get_sector_performance", "description": "Get sector-wise performance"},
+    {"name": "get_dividend_info", "description": "Get dividend information"},
+    {"name": "get_52w_proximity", "description": "Check if stock is near 52-week high/low"},
+    {"name": "get_bulk_quotes", "description": "Get live prices for multiple stocks"},
+    {"name": "get_index_constituents", "description": "Get stocks in Indian indices"},
+    {"name": "compare_stocks", "description": "Compare multiple stocks side by side"},
+    {"name": "get_technical_snapshot", "description": "Get technical analysis snapshot"},
+    {"name": "get_stock_chart", "description": "Generate stock price chart with moving averages"},
+    {"name": "get_stock_news", "description": "Get latest stock news from Yahoo Finance"},
+    {"name": "get_fii_dii_data", "description": "Get FII/DII daily flow data from NSE"},
+    {"name": "get_analyst_recommendations", "description": "Get analyst recommendations"},
+    {"name": "get_earnings_calendar", "description": "Get upcoming earnings dates"},
+    {"name": "get_corporate_actions", "description": "Get corporate actions"},
+    {"name": "get_heatmap_data", "description": "Get Nifty 50 heatmap data"},
+    {"name": "get_insider_trading", "description": "Get insider trading activity"},
+    {"name": "get_ipo_calendar", "description": "Get upcoming IPO calendar"},
+    {"name": "ai_screener", "description": "AI-powered natural language stock screener"},
+    {"name": "detect_candlestick_patterns", "description": "Detect candlestick patterns"},
+    {"name": "get_news_sentiment", "description": "Get news sentiment score"},
+    {"name": "get_correlation", "description": "Find correlated stocks"},
+    {"name": "get_mutual_fund_nav", "description": "Get mutual fund NAV data"},
+    {"name": "get_options_chain", "description": "Get options chain with Greeks"}
+  ]
+}
