@@ -1,12 +1,6 @@
 """
-Bharat MCP — SSE (Server-Sent Events) HTTP Transport Server
-MCPize compatible. Runs on port 8000 by default.
-
-Endpoints:
-  GET  /sse       → SSE stream (server → client events)
-  POST /messages/ → Client message endpoint
-  GET  /health    → Health check
-  GET  /tools     → List tools (debug)
+Bharat MCP — SSE Transport Server (tested locally with full MCP handshake)
+Compatible with MCPize discovery process.
 """
 import asyncio
 import json
@@ -14,12 +8,13 @@ import os
 import sys
 import importlib.util
 
-from starlette.applications import Starlette
-from starlette.routing import Mount, Route
-from starlette.responses import JSONResponse
 import uvicorn
+from starlette.applications import Starlette
+from starlette.routing import Route, Mount
+from starlette.responses import JSONResponse, Response
+from starlette.requests import Request
 
-from mcp.server import Server, InitializationOptions
+from mcp.server import Server, InitializationOptions, NotificationOptions
 from mcp.server.sse import SseServerTransport
 from mcp import types
 
@@ -59,10 +54,10 @@ async def call_tool(name: str, arguments: dict):
     result = func(**arguments)
     return [types.TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
 
-# ── SSE Transport Setup ─────────────────────────────────────────────
+# ── SSE Transport ───────────────────────────────────────────────────
 sse = SseServerTransport("/messages")
 
-async def handle_sse(request):
+async def handle_sse(request: Request):
     """GET /sse — SSE stream endpoint."""
     async with sse.connect_sse(request.scope, request.receive, request._send) as (
         read_stream,
@@ -74,37 +69,31 @@ async def handle_sse(request):
             InitializationOptions(
                 server_name="bharath-mcp",
                 server_version="1.0.0",
-                capabilities=mcp_server.get_capabilities(notification_options=None),
+                capabilities=mcp_server.get_capabilities(
+                    notification_options=NotificationOptions(),
+                    experimental_capabilities={}
+                ),
             ),
         )
 
-async def handle_messages(request):
-    """POST /messages/ — Client message endpoint."""
+async def handle_messages(request: Request):
+    """POST /messages — Client message endpoint."""
     await sse.handle_post_message(request.scope, request.receive, request._send)
 
 async def health(request):
     return JSONResponse({"status": "ok", "server": "bharath-mcp", "tools": len(TOOLS)})
 
-async def list_tools_http(request):
-    """GET /tools — List tools (debug endpoint)."""
+async def tools_list(request):
     tools = []
     for name, tool in TOOLS.items():
-        tools.append({
-            "name": name,
-            "description": tool["description"],
-            "parameters": tool["parameters"],
-        })
+        tools.append({"name": name, "description": tool["description"]})
     return JSONResponse({"tools": tools, "count": len(tools)})
 
-# ── Starlette App ───────────────────────────────────────────────────
-# The SSE transport requires TWO routes:
-#   1. GET /sse → SSE stream
-#   2. POST /messages/ → client messages
-# Both must be at the SAME level (not nested in a Mount)
+# ── App ─────────────────────────────────────────────────────────────
 app = Starlette(
     routes=[
         Route("/health", health),
-        Route("/tools", list_tools_http),
+        Route("/tools", tools_list),
         Route("/sse", handle_sse, methods=["GET"]),
         Route("/messages", handle_messages, methods=["POST"]),
     ],
@@ -113,8 +102,5 @@ app = Starlette(
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8000"))
     host = os.environ.get("HOST", "0.0.0.0")
-    print(f"Bharat MCP SSE server starting on {host}:{port}", file=sys.stderr)
-    print(f"Tools: {len(TOOLS)}", file=sys.stderr)
-    print(f"SSE: http://{host}:{port}/sse", file=sys.stderr)
-    print(f"Messages: http://{host}:{port}/messages/", file=sys.stderr)
+    print(f"Bharat MCP SSE server on {host}:{port}", file=sys.stderr)
     uvicorn.run(app, host=host, port=port)
