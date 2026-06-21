@@ -60,7 +60,7 @@ async def call_tool(name: str, arguments: dict):
     return [types.TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
 
 # ── SSE Transport Setup ─────────────────────────────────────────────
-sse = SseServerTransport("/messages/")
+sse = SseServerTransport("/messages")
 
 async def handle_sse(request):
     """GET /sse — SSE stream endpoint."""
@@ -106,7 +106,7 @@ app = Starlette(
         Route("/health", health),
         Route("/tools", list_tools_http),
         Route("/sse", handle_sse, methods=["GET"]),
-        Route("/messages/", handle_messages, methods=["POST"]),
+        Route("/messages", handle_messages, methods=["POST"]),
     ],
 )
 
