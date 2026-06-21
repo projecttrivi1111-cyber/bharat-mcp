@@ -833,16 +833,21 @@ def tool_get_fii_dii_data() -> dict:
         
         if isinstance(data, list) and len(data) > 0:
             latest = data[0]
+            fii_net = latest.get("fiiNet", 0)
+            dii_net = latest.get("diiNet", 0)
+            # Check if data is all zeros (weekend/holiday)
+            is_stale = (latest.get("fiiBuyValue", 0) == 0 and latest.get("fiiSellValue", 0) == 0)
             return {
                 "date": latest.get("date", ""),
                 "fii_buy_value_cr": latest.get("fiiBuyValue", 0),
                 "fii_sell_value_cr": latest.get("fiiSellValue", 0),
-                "fii_net_cr": latest.get("fiiNet", 0),
+                "fii_net_cr": fii_net,
                 "dii_buy_value_cr": latest.get("diiBuyValue", 0),
                 "dii_sell_value_cr": latest.get("diiSellValue", 0),
-                "dii_net_cr": latest.get("diiNet", 0),
-                "net_fii_dii_cr": (latest.get("fiiNet", 0) or 0) + (latest.get("diiNet", 0) or 0),
+                "dii_net_cr": dii_net,
+                "net_fii_dii_cr": (fii_net or 0) + (dii_net or 0),
                 "source": "NSE",
+                "note": "Markets closed (weekend/holiday) — no trading data" if is_stale else "Live data",
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S IST")
             }
         
@@ -1105,21 +1110,22 @@ def tool_ai_screener(query: str) -> dict:
         query_lower = query.lower()
         criteria = {}
         
-        # Fast keyword matching
+        # Fast keyword matching (word-boundary aware, includes plurals)
         sector_map = {
             "it": "Information Technology", "tech": "Information Technology", "software": "Information Technology",
             "pharma": "Healthcare", "pharmaceutical": "Healthcare", "drug": "Healthcare", "medicine": "Healthcare",
-            "bank": "Financial Services", "banking": "Financial Services", "finance": "Financial Services", "financial": "Financial Services",
+            "bank": "Financial Services", "banks": "Financial Services", "banking": "Financial Services", "finance": "Financial Services", "financial": "Financial Services",
             "fmcg": "Consumer Defensive", "consumer": "Consumer Defensive",
-            "auto": "Industrials", "automobile": "Industrials", "car": "Industrials",
+            "auto": "Industrials", "automobile": "Industrials", "car": "Industrials", "cars": "Industrials",
             "energy": "Energy", "oil": "Energy", "gas": "Energy", "petroleum": "Energy",
             "metal": "Basic Materials", "steel": "Basic Materials", "mining": "Basic Materials",
             "real estate": "Real Estate", "reality": "Real Estate", "property": "Real Estate",
             "telecom": "Communication Services", "media": "Communication Services",
             "power": "Utilities", "electricity": "Utilities"
         }
+        import re as _re
         for keyword, sector in sector_map.items():
-            if keyword in query_lower:
+            if _re.search(r'\b' + _re.escape(keyword) + r'\b', query_lower):
                 criteria["sector"] = sector
                 break
         
@@ -1224,18 +1230,18 @@ def tool_ai_screener(query: str) -> dict:
         return {"error": str(e)}
 
 def tool_get_options_chain(symbol: str, expiry: str = None) -> dict:
-    """Get options chain data for Nifty/Bank Nifty/individual stocks. Shows strike prices, OI, volume, Greeks."""
+    """Get options chain data. NOTE: yfinance does not support Indian options. Use for US stocks only."""
     try:
-        symbol = _fuzzy_match_symbol(symbol)
+        # Don't add .NS suffix for options — user should pass raw symbol like NIFTY, AAPL
         ticker = yf.Ticker(symbol)
         
         # Get available expiry dates
         try:
             expirations = ticker.options
             if not expirations:
-                return {"error": f"No options data for {symbol}"}
+                return {"error": f"No options data for {symbol}. Note: Indian stock options (NSE) are not supported by yfinance. This tool works for US stocks only (e.g., AAPL, TSLA, SPY)."}
         except Exception:
-            return {"error": f"No options data available for {symbol}"}
+            return {"error": f"No options data available for {symbol}. Note: Indian stock options (NSE) are not supported by yfinance. This tool works for US stocks only (e.g., AAPL, TSLA, SPY)."}
         
         # Use first expiry if not specified
         if expiry is None or expiry not in expirations:
