@@ -1,6 +1,12 @@
 """
 Bharat MCP — SSE (Server-Sent Events) HTTP Transport Server
 MCPize compatible. Runs on port 8000 by default.
+
+Endpoints:
+  GET  /sse       → SSE stream (server → client events)
+  POST /messages/ → Client message endpoint
+  GET  /health    → Health check
+  GET  /tools     → List tools (debug)
 """
 import asyncio
 import json
@@ -10,7 +16,7 @@ import importlib.util
 
 from starlette.applications import Starlette
 from starlette.routing import Mount, Route
-from starlette.responses import JSONResponse, PlainTextResponse
+from starlette.responses import JSONResponse
 import uvicorn
 
 from mcp.server import Server, InitializationOptions
@@ -57,6 +63,7 @@ async def call_tool(name: str, arguments: dict):
 sse = SseServerTransport("/messages/")
 
 async def handle_sse(request):
+    """GET /sse — SSE stream endpoint."""
     async with sse.connect_sse(request.scope, request.receive, request._send) as (
         read_stream,
         write_stream,
@@ -71,11 +78,15 @@ async def handle_sse(request):
             ),
         )
 
+async def handle_messages(request):
+    """POST /messages/ — Client message endpoint."""
+    await sse.handle_post_message(request.scope, request.receive, request._send)
+
 async def health(request):
     return JSONResponse({"status": "ok", "server": "bharath-mcp", "tools": len(TOOLS)})
 
 async def list_tools_http(request):
-    """HTTP endpoint to list tools directly (for debugging)."""
+    """GET /tools — List tools (debug endpoint)."""
     tools = []
     for name, tool in TOOLS.items():
         tools.append({
@@ -85,11 +96,17 @@ async def list_tools_http(request):
         })
     return JSONResponse({"tools": tools, "count": len(tools)})
 
+# ── Starlette App ───────────────────────────────────────────────────
+# The SSE transport requires TWO routes:
+#   1. GET /sse → SSE stream
+#   2. POST /messages/ → client messages
+# Both must be at the SAME level (not nested in a Mount)
 app = Starlette(
     routes=[
         Route("/health", health),
         Route("/tools", list_tools_http),
-        Mount("/sse", app=handle_sse),
+        Route("/sse", handle_sse, methods=["GET"]),
+        Route("/messages/", handle_messages, methods=["POST"]),
     ],
 )
 
@@ -98,6 +115,6 @@ if __name__ == "__main__":
     host = os.environ.get("HOST", "0.0.0.0")
     print(f"Bharat MCP SSE server starting on {host}:{port}", file=sys.stderr)
     print(f"Tools: {len(TOOLS)}", file=sys.stderr)
-    print(f"SSE endpoint: http://{host}:{port}/sse", file=sys.stderr)
-    print(f"Health: http://{host}:{port}/health", file=sys.stderr)
+    print(f"SSE: http://{host}:{port}/sse", file=sys.stderr)
+    print(f"Messages: http://{host}:{port}/messages/", file=sys.stderr)
     uvicorn.run(app, host=host, port=port)
