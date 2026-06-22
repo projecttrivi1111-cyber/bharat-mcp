@@ -1,5 +1,5 @@
 """
-Bharat MCP — SSE Transport Server (tested locally with full MCP handshake)
+Bharat MCP — SSE Transport Server
 Compatible with MCPize discovery process.
 """
 import asyncio
@@ -10,8 +10,8 @@ import importlib.util
 
 import uvicorn
 from starlette.applications import Starlette
-from starlette.routing import Route, Mount
-from starlette.responses import JSONResponse, Response
+from starlette.routing import Route
+from starlette.responses import JSONResponse
 from starlette.requests import Request
 
 from mcp.server import Server, InitializationOptions, NotificationOptions
