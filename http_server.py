@@ -1,11 +1,14 @@
 """
-Bharat MCP — SSE Transport Server
+Bharat MCP — Dual Transport Server (SSE + Streamable HTTP)
 Compatible with MCPize discovery process.
 
-Works with both Starlette 0.48.x and 1.x by returning an ASGI callable
-from the SSE route handler instead of relying on Response objects.
+Endpoints:
+- GET  /sse       — SSE transport (for SSE clients)
+- POST /messages  — SSE message endpoint
+- POST /mcp       — Streamable HTTP transport (for MCPize discovery)
+- GET  /health    — Health check
+- GET  /tools     — List available tools
 """
-import asyncio
 import json
 import os
 import sys
@@ -14,7 +17,7 @@ import importlib.util
 import uvicorn
 from starlette.applications import Starlette
 from starlette.routing import Route
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from starlette.requests import Request
 
 from mcp.server import Server, InitializationOptions, NotificationOptions
@@ -65,18 +68,7 @@ sse = SseServerTransport("/messages")
 
 
 async def handle_sse(request: Request):
-    """GET /sse — SSE stream endpoint.
-
-    Starlette 1.x expects route handlers to return an ASGI callable.
-    sse.connect_sse() manages the response via send() internally.
-    We return a wrapper ASGI app that delegates to the MCP session.
-    """
-    # Capture the ASGI send callable from the request
-    scope = request.scope
-    receive = request.receive
-    send = request._send
-
-    # Return an ASGI callable that Starlette 1.x can invoke
+    """GET /sse — SSE stream endpoint. Returns ASGI callable for Starlette compat."""
     async def asgi_app(scope, receive, send):
         async with sse.connect_sse(scope, receive, send) as (
             read_stream,
@@ -99,8 +91,36 @@ async def handle_sse(request: Request):
 
 
 async def handle_messages(request: Request):
-    """POST /messages — Client message endpoint."""
+    """POST /messages — SSE client message endpoint."""
     await sse.handle_post_message(request.scope, request.receive, request._send)
+
+
+# ── Streamable HTTP Transport ───────────────────────────────────────
+# MCPize discovery probes /mcp via Streamable HTTP.
+# We create a session manager that handles stateless MCP sessions.
+import anyio
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+
+session_manager = StreamableHTTPSessionManager(
+    app=mcp_server,
+    event_store=None,
+    json_response=True,
+    stateless=True,
+)
+
+
+async def handle_mcp(request: Request):
+    """GET/POST /mcp — Streamable HTTP transport endpoint.
+
+    The session manager handles the response via send().
+    We return None to tell Starlette the response was already handled.
+    """
+    await session_manager.handle_request(
+        request.scope, request.receive, request._send
+    )
+    # Response already sent via the session manager's send() calls.
+    # Return None to prevent Starlette from sending a second response.
+    return None
 
 
 async def health(request):
@@ -121,11 +141,12 @@ app = Starlette(
         Route("/tools", tools_list),
         Route("/sse", handle_sse, methods=["GET"]),
         Route("/messages", handle_messages, methods=["POST"]),
+        Route("/mcp", handle_mcp, methods=["GET", "POST"]),
     ],
 )
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8000"))
     host = os.environ.get("HOST", "0.0.0.0")
-    print(f"Bharat MCP SSE server on {host}:{port}", file=sys.stderr)
+    print(f"Bharat MCP server on {host}:{port}", file=sys.stderr)
     uvicorn.run(app, host=host, port=port)
