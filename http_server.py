@@ -5,18 +5,20 @@ Compatible with MCPize discovery process.
 Endpoints:
 - GET  /sse       — SSE transport (for SSE clients)
 - POST /messages  — SSE message endpoint
-- POST /mcp       — Streamable HTTP transport (for MCPize discovery)
+- ALL  /mcp       — Streamable HTTP transport (for MCPize discovery)
 - GET  /health    — Health check
 - GET  /tools     — List available tools
 """
+import asyncio
 import json
 import os
 import sys
 import importlib.util
+from contextlib import asynccontextmanager
 
 import uvicorn
 from starlette.applications import Starlette
-from starlette.routing import Route
+from starlette.routing import Route, Mount
 from starlette.responses import JSONResponse, Response
 from starlette.requests import Request
 
@@ -97,8 +99,10 @@ async def handle_messages(request: Request):
 
 # ── Streamable HTTP Transport ───────────────────────────────────────
 # MCPize discovery probes /mcp via Streamable HTTP.
-# We create a session manager that handles stateless MCP sessions.
-import anyio
+# We use StreamableHTTPSessionManager with proper lifespan integration.
+# The /mcp endpoint is mounted as a raw ASGI sub-app to bypass
+# Starlette's request_response wrapper (which would try to call
+# the return value as a Response).
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
 session_manager = StreamableHTTPSessionManager(
@@ -109,18 +113,22 @@ session_manager = StreamableHTTPSessionManager(
 )
 
 
-async def handle_mcp(request: Request):
-    """GET/POST /mcp — Streamable HTTP transport endpoint.
+@asynccontextmanager
+async def lifespan(app):
+    """Manage the session manager lifecycle."""
+    async with session_manager.run():
+        yield
 
-    The session manager handles the response via send().
-    We return None to tell Starlette the response was already handled.
+
+class MCPApp:
+    """ASGI app that delegates to the Streamable HTTP session manager.
+    
+    This is a class-based ASGI app, so Starlette won't wrap it with
+    request_response. It receives raw (scope, receive, send) and delegates
+    to the session manager which handles the full MCP session lifecycle.
     """
-    await session_manager.handle_request(
-        request.scope, request.receive, request._send
-    )
-    # Response already sent via the session manager's send() calls.
-    # Return None to prevent Starlette from sending a second response.
-    return None
+    async def __call__(self, scope, receive, send):
+        await session_manager.handle_request(scope, receive, send)
 
 
 async def health(request):
@@ -136,12 +144,13 @@ async def tools_list(request):
 
 # ── App ─────────────────────────────────────────────────────────────
 app = Starlette(
+    lifespan=lifespan,
     routes=[
         Route("/health", health),
         Route("/tools", tools_list),
         Route("/sse", handle_sse, methods=["GET"]),
         Route("/messages", handle_messages, methods=["POST"]),
-        Route("/mcp", handle_mcp, methods=["GET", "POST"]),
+        Mount("/mcp", app=MCPApp()),
     ],
 )
 
