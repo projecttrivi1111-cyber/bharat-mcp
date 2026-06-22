@@ -1,6 +1,9 @@
 """
 Bharat MCP — SSE Transport Server
 Compatible with MCPize discovery process.
+
+Works with both Starlette 0.48.x and 1.x by returning an ASGI callable
+from the SSE route handler instead of relying on Response objects.
 """
 import asyncio
 import json
@@ -33,6 +36,7 @@ TOOLS = bharath_mcp.TOOLS
 # ── Create MCP Server ────────────────────────────────────────────────
 mcp_server = Server("bharath-mcp")
 
+
 @mcp_server.list_tools()
 async def list_tools():
     tools = []
@@ -46,6 +50,7 @@ async def list_tools():
         )
     return tools
 
+
 @mcp_server.call_tool()
 async def call_tool(name: str, arguments: dict):
     if name not in TOOLS:
@@ -54,40 +59,60 @@ async def call_tool(name: str, arguments: dict):
     result = func(**arguments)
     return [types.TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
 
+
 # ── SSE Transport ───────────────────────────────────────────────────
 sse = SseServerTransport("/messages")
 
+
 async def handle_sse(request: Request):
-    """GET /sse — SSE stream endpoint."""
-    async with sse.connect_sse(request.scope, request.receive, request._send) as (
-        read_stream,
-        write_stream,
-    ):
-        await mcp_server.run(
+    """GET /sse — SSE stream endpoint.
+
+    Starlette 1.x expects route handlers to return an ASGI callable.
+    sse.connect_sse() manages the response via send() internally.
+    We return a wrapper ASGI app that delegates to the MCP session.
+    """
+    # Capture the ASGI send callable from the request
+    scope = request.scope
+    receive = request.receive
+    send = request._send
+
+    # Return an ASGI callable that Starlette 1.x can invoke
+    async def asgi_app(scope, receive, send):
+        async with sse.connect_sse(scope, receive, send) as (
             read_stream,
             write_stream,
-            InitializationOptions(
-                server_name="bharath-mcp",
-                server_version="1.0.0",
-                capabilities=mcp_server.get_capabilities(
-                    notification_options=NotificationOptions(),
-                    experimental_capabilities={}
+        ):
+            await mcp_server.run(
+                read_stream,
+                write_stream,
+                InitializationOptions(
+                    server_name="bharath-mcp",
+                    server_version="1.0.0",
+                    capabilities=mcp_server.get_capabilities(
+                        notification_options=NotificationOptions(),
+                        experimental_capabilities={}
+                    ),
                 ),
-            ),
-        )
+            )
+
+    return asgi_app
+
 
 async def handle_messages(request: Request):
     """POST /messages — Client message endpoint."""
     await sse.handle_post_message(request.scope, request.receive, request._send)
 
+
 async def health(request):
     return JSONResponse({"status": "ok", "server": "bharath-mcp", "tools": len(TOOLS)})
+
 
 async def tools_list(request):
     tools = []
     for name, tool in TOOLS.items():
         tools.append({"name": name, "description": tool["description"]})
-    return JSONResponse({"tools": tools, "count": len(tools)})
+    return JSONResponse({"tools": tools, "count": len(TOOLS)})
+
 
 # ── App ─────────────────────────────────────────────────────────────
 app = Starlette(
