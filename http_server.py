@@ -9,7 +9,6 @@ Endpoints:
 - GET  /health    — Health check
 - GET  /tools     — List available tools
 """
-import asyncio
 import json
 import os
 import sys
@@ -18,8 +17,8 @@ from contextlib import asynccontextmanager
 
 import uvicorn
 from starlette.applications import Starlette
-from starlette.routing import Route, Mount
-from starlette.responses import JSONResponse, Response
+from starlette.routing import Route
+from starlette.responses import JSONResponse
 from starlette.requests import Request
 
 from mcp.server import Server, InitializationOptions, NotificationOptions
@@ -98,11 +97,6 @@ async def handle_messages(request: Request):
 
 
 # ── Streamable HTTP Transport ───────────────────────────────────────
-# MCPize discovery probes /mcp via Streamable HTTP.
-# We use StreamableHTTPSessionManager with proper lifespan integration.
-# The /mcp endpoint is mounted as a raw ASGI sub-app to bypass
-# Starlette's request_response wrapper (which would try to call
-# the return value as a Response).
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
 session_manager = StreamableHTTPSessionManager(
@@ -123,12 +117,15 @@ async def lifespan(app):
 class MCPApp:
     """ASGI app that delegates to the Streamable HTTP session manager.
     
-    This is a class-based ASGI app, so Starlette won't wrap it with
-    request_response. It receives raw (scope, receive, send) and delegates
-    to the session manager which handles the full MCP session lifecycle.
+    This is a class-based endpoint (not a function), so Starlette's Route
+    treats it as a raw ASGI app and calls it directly with (scope, receive, send)
+    without wrapping it in request_response().
     """
     async def __call__(self, scope, receive, send):
         await session_manager.handle_request(scope, receive, send)
+
+
+mcp_app = MCPApp()
 
 
 async def health(request):
@@ -143,6 +140,7 @@ async def tools_list(request):
 
 
 # ── App ─────────────────────────────────────────────────────────────
+# redirect_slashes=False prevents 307 redirects on /mcp → /mcp/
 app = Starlette(
     lifespan=lifespan,
     routes=[
@@ -150,7 +148,7 @@ app = Starlette(
         Route("/tools", tools_list),
         Route("/sse", handle_sse, methods=["GET"]),
         Route("/messages", handle_messages, methods=["POST"]),
-        Mount("/mcp", app=MCPApp()),
+        Route("/mcp", mcp_app, methods=["GET", "POST", "DELETE"]),
     ],
 )
 
